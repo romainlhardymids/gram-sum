@@ -506,8 +506,8 @@ if __name__ == "__main__":
     chapter_raw_data['score'] = chapter_raw_data.apply(lambda row: results['score'][(row['chapter_id'], row['summary_source'])], axis=1)
 
     # Save the results
-    save_path = os.path.join(args.root_dir, f'data/chapter/test_t5small_{args.strategy}_k{K}.csv')
-    logger.info(f'Saving paragraph-level results to {save_path}')
+    save_path = os.path.join(args.root_dir, f'data/chapter/test.csv')
+    logger.info(f'Saving chapter-level results to {save_path}')
     save_chapter_results(chapter_raw_data, save_path)
 
     logger.info('Finished!')
