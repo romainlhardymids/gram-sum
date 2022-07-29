@@ -8,6 +8,7 @@ Paper link:
 
 # Usage
 1. [Downloading the BookSum dataset](#booksum)
+2. [Preparing the BookSum data](#prepare-data)
 2. [Fine-tuning a paragraph-level encoder-decoder model](#finetune-booksum)
 3. [Fine-tuning a named entity recognition model](#finetune-ner)
 4. [Extracting and resolving entities](#extract-entities)
@@ -16,22 +17,20 @@ Paper link:
 7. [Generating and evaluating book-level summaries](#evaluate-book)
 8. [Calculating average pairwise sentence embeddings](#pairwise-embeddings)
 
-## Downloading the BookSum dataset
+## Downloading the BookSum dataset<a name="booksum"></a>
 To download the BookSum dataset, please follow the instructions at https://github.com/salesforce/booksum.
 
-## Preparing the BookSum data
-To match the data format expected by GraM-SUM, please use the `load_booksum_data.py` script:
+## Preparing the BookSum data<a name="prepare-data"></a>
 ```
 !python3 ./gram-sum/setup/load_booksum_data.py \
     --booksum_dir=/content/drive/MyDrive/W266/Final\ Project/booksum/ \
     --save_dir=/content/drive/MyDrive/W266/Final\ Project/data/
 ```
 
-## Fine-tuning a paragraph-level encoder-decoder model
+## Fine-tuning a paragraph-level encoder-decoder model<a name="finetune-booksum"></a>
 At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tuned on the BookSum dataset. To replicate this training, you may use the code found in `training/finetune-booksum`. Although this notebook was originally run in SageMaker, it can be adapted to run locally or in Colab.
 
-## Fine-tuning a named entity recognition model
-GraM-SUM uses a named entity recognition model (NER) to identify entities and create both chapter-level and book-level bipartite graphs. To fine-tune a NER model and save it to the Huggingface hub, please use the `finetune_ner.py` script:
+## Fine-tuning a named entity recognition model<a name="finetune-ner"></a>
 ```
 !python3 ./gram-sum/training/finetune_ner.py \
     --output_dir=./finetuned-ner \
@@ -45,16 +44,14 @@ GraM-SUM uses a named entity recognition model (NER) to identify entities and cr
     --gradient_accumulation_steps=1
 ```
 
-## Extracting and resolving entities
-To extract and resolve entities using a NER model, please use the `extract_paragraph_entities.py` script:
+## Extracting and resolving entities<a name="extract-entities"></a>
 ```
 !python3 ./gram-sum/evaluation/extract_paragraph_entities.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project/ \
     --top_entities=100
 ```
 
-## Generating and evaluating paragraph-level summaries
-To generate and evaluate paragraph-level summaries on the BookSum test dataset, please use the `evaluate_paragraph_summaries.py` script:
+## Generating and evaluating paragraph-level summaries<a name="evaluate-paragraph"></a>
 ```
 !python3 ./gram-sum/evaluation/evaluate_paragraph_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project/ \
@@ -67,8 +64,7 @@ To generate and evaluate paragraph-level summaries on the BookSum test dataset, 
     --max_length=200
 ```
 
-## Generating and evaluating chapter-level summaries
-To generate and evaluate chapter-level summaries on the BookSum test dataset, please use the `evaluate_chapter_summaries.py` script: 
+## Generating and evaluating chapter-level summaries<a name="evaluate-chapter"></a>
 ```
 !python3 ./gram-sum/evaluation/evaluate_chapter_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project \
@@ -83,8 +79,7 @@ To generate and evaluate chapter-level summaries on the BookSum test dataset, pl
     --args.importance_weight=1
 ```
 
-## Generating and evaluating book-level summaries
-To generate and evaluate book-level summaries on the BookSum test dataset, please use the `evaluate_book_summaries.py` script: 
+## Generating and evaluating book-level summaries<a name="evaluate-book"></a>
 ```
 !python3 ./gram-sum/evaluation/evaluate_book_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project \
@@ -99,10 +94,9 @@ To generate and evaluate book-level summaries on the BookSum test dataset, pleas
     --args.importance_weight=1
 ```
 
-## Calculating average pairwise sentence embeddings
-To calculate average pairwise sentence embeddings for a set of results, please use the `embedding_diversity.py` script:
+## Calculating average pairwise sentence embeddings<a name="pairwise-embeddings"></a>
 ```
-!python3 /content/drive/MyDrive/W266/Final\ Project/scripts/embedding_diversity.py \
+!python3 ./gram-sum/evaluation/embedding_diversity.py \
     --results_path=/content/drive/MyDrive/W266/Final\ Project/data/book/test.csv \
     --model_name=all-mpnet-base-v2
 ```
