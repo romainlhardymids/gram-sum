@@ -26,10 +26,11 @@ from transformers import (
     T5ForConditionalGeneration, 
 )
 
+nltk.download('punkt')
 
+
+# PyTorch device
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-NUM_SAMPLES = 10000
-K = 9
 
 
 def save_chapter_results(results, file_path):
@@ -37,7 +38,7 @@ def save_chapter_results(results, file_path):
     results.to_csv(file_path, index=None)
 
 
-def generate_chapter_candidates_perplexity(model, tokenizer, paragraphs_list, candidate_length=512):
+def generate_chapter_candidates_perplexity(model, tokenizer, paragraphs_list, chain_length):
     """Generates chapter-level candidate summaries and compute their perplexities."""
     chapter_candidates = []
     for paragraphs in paragraphs_list:
@@ -45,11 +46,7 @@ def generate_chapter_candidates_perplexity(model, tokenizer, paragraphs_list, ca
         paragraph_candidates, perplexities = zip(*zipped)
         sorted_idx = np.argsort(perplexities)
         top_paragraph_idx = []
-        n = 0
-        for i in sorted_idx[:K]:
-            if n + len(nltk.word_tokenize(paragraph_candidates[i])) > candidate_length:
-                break
-            n += len(nltk.word_tokenize(paragraph_candidates[i]))
+        for i in sorted_idx[:chain_length]:
             top_paragraph_idx.append(i)
         chapter_candidates.append(' '.join([paragraph_candidates[i] for i in sorted(top_paragraph_idx)]))
     chapter_candidate_tokens = tokenizer(chapter_candidates, truncation=False, padding='longest', return_tensors='pt').input_ids
@@ -59,14 +56,8 @@ def generate_chapter_candidates_perplexity(model, tokenizer, paragraphs_list, ca
     return chapter_candidates, perplexities
 
 
-def evaluate_chapters_perplexity(
-    model,
-    tokenizer,
-    chapter_loader,
-    use_stemmer=True,
-    candidate_length=512,
-):
-    """Generate and evaluate chapter-level summaries."""
+def evaluate_chapters_perplexity(model, tokenizer, chapter_loader, use_stemmer=True, chain_length=5):
+    """Generates and evaluate chapter-level summaries."""
     rouge = ROUGEScore(use_stemmer=use_stemmer)
     t = tqdm(chapter_loader)
     results = {'candidate': {}, 'score': {}}
@@ -99,7 +90,7 @@ def evaluate_chapters_perplexity(
 
 
 def create_chapter_graph(paragraphs, book_entities_deduped, book_entities_counts):
-    """Creates an unnormalized bipartite graph linking entities to paragraphs."""
+    """Creates an unnormalized bipartite graph linking entities to paragraph summaries."""
     paragraph_candidates = [p['candidate'] for p in paragraphs]
     graph = nx.DiGraph()
     for i, candidate in enumerate(paragraph_candidates):
@@ -152,13 +143,11 @@ def compute_progression_scores(graph, epsilon=0.1):
     epsilon = 0.1
     T = nx.adjacency_matrix(graph).tolil()
     node_list, sector_nodes, entity_nodes = split_nodes_by_type(graph)
-    
     steady_state_sectors = {}
     for i, sector_i in enumerate(sector_nodes):
         k = node_list.index(sector_i)
         s = compute_steady_state_distribution(T, k, epsilon)
         steady_state_sectors[sector_i] = s
-    
     steady_state_entities = {}
     for i, sector_i in enumerate(sector_nodes):
         k = node_list.index(sector_i)
@@ -169,7 +158,6 @@ def compute_progression_scores(graph, epsilon=0.1):
             T_c[c] = np.zeros(T.shape[0])
             s_c = compute_steady_state_distribution(T_c, k, epsilon)
             steady_state_entities[sector_i][entity] = s_c
-
     progression_scores = {}
     for i, sector_i in enumerate(sector_nodes):
         s = steady_state_sectors[sector_i]
@@ -179,24 +167,6 @@ def compute_progression_scores(graph, epsilon=0.1):
             for entity in entity_nodes:
                 s_c = steady_state_entities[sector_i][entity]
                 progression_scores[(sector_i, sector_j)] += s[l] - s_c[l]
-
-
-    # progression_scores_entity = {}
-    # for i, sector_i in enumerate(sector_nodes):
-    #     k = node_list.index(sector_i)
-    #     s = compute_steady_state_distribution(T, k, epsilon)
-    #     for j, sector_j in enumerate(sector_nodes[i + 1:]):
-    #         l = node_list.index(sector_j)
-    #         progression_scores_entity.setdefault((sector_i, sector_j), {})
-    #         for entity in entity_nodes:
-    #             c = node_list.index(entity)
-    #             T_c = T.copy()
-    #             T_c[c] = np.zeros(T.shape[0])
-    #             s_c = compute_steady_state_distribution(T_c, k, epsilon)
-    #             progression_scores_entity[(sector_i, sector_j)][entity] = s[l] - s_c[l]
-    # progression_scores = {}
-    # for key in progression_scores_entity:
-    #     progression_scores[key] = sum(progression_scores_entity[key].values())
     return progression_scores
 
 
@@ -297,21 +267,17 @@ def get_chain_score(scores, chain, dependent=True):
     return chain_score
 
 
-def choose_optimal_chain(pdi_scores, paragraph_candidates, weights, candidate_length):
+def choose_optimal_chain(pdi_scores, paragraph_candidates, weights, chain_length):
     """Returns the optimal chain given progression, diversity, and importance scores for all sectors."""
     num_sectors = len(pdi_scores['importance'])
     best_chain = []
     best_candidate = ''
     best_score = 0.0
-    chain_length = min(K, num_sectors)
-    num_possible_chains = int(binom(num_sectors, chain_length))
-    # possible_chains = combinations(range(num_sectors), chain_length)
-    # sampled_idx = set(random.sample(range(num_possible_chains), min(num_possible_chains, NUM_SAMPLES)))
-    # sampled_chains = [chain for i, chain in enumerate(possible_chains) if i in sampled_idx]
-    # for chain in sampled_chains:
+    chain_length_ = min(chain_length, num_sectors)
+    num_possible_chains = int(binom(num_sectors, chain_length_))
     counter = 0
     while counter < min(2 * num_possible_chains, NUM_SAMPLES):
-        chain = sorted(random.sample(range(num_sectors), chain_length))
+        chain = sorted(random.sample(range(num_sectors), chain_length_))
         chapter_candidate = ' '.join([paragraph_candidates[i] for i in chain])
         if len(nltk.word_tokenize(chapter_candidate)) > candidate_length:
             counter += 1
@@ -337,7 +303,7 @@ def generate_chapter_candidates_graph(
     book_entities_counts,
     weights,
     epsilon=0.1,
-    candidate_length=512
+    chain_length=5
 ):
     """Generates chapter-level candidate summaries using a graph-based strategy."""
     chapter_candidates = []
@@ -360,7 +326,7 @@ def generate_chapter_candidates_graph(
             pdi_scores, 
             paragraph_candidates=paragraph_candidates, 
             weights=weights,
-            candidate_length=candidate_length
+            chain_length=chain_length
         )
         chapter_candidates.append(chapter_candidate)
         scores.append(score)
@@ -373,7 +339,7 @@ def evaluate_chapters_graph(
     weights,
     use_stemmer=True, 
     epsilon=0.1,
-    candidate_length=512
+    chain_length=5
 ):
     """Generates and evaluates chapter-level summaries using a graph-based strategy."""
     rouge = ROUGEScore(use_stemmer=use_stemmer)
@@ -396,7 +362,7 @@ def evaluate_chapters_graph(
             deduped_book_counts,
             weights=weights,
             epsilon=epsilon,
-            candidate_length=candidate_length
+            chain_length=chain_length
         )
         chapter_candidates = ['\n'.join(nltk.sent_tokenize(c.strip())) for c in chapter_candidates]
         references = ['\n'.join(nltk.sent_tokenize(r.strip())) for r in references]
@@ -416,17 +382,67 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--root_dir', type=str, default='')
-    parser.add_argument('--model_name', type=str, default='')
-    parser.add_argument('--auth_token', type=str, default='')
-
-    parser.add_argument('--strategy', type=str, choices=['perplexity', 'graph'], default='perplexity')
-    parser.add_argument('--use_stemmer', type=bool, default=False)
-    parser.add_argument('--candidate_length', type=int, default=3)
-    parser.add_argument('--epsilon', type=float, default=0.1)
-    parser.add_argument('--progression_weight', type=float, default=1.0)
-    parser.add_argument('--diversity_weight', type=float, default=1.0)
-    parser.add_argument('--importance_weight', type=float, default=1.0)
+    parser.add_argument(
+        '--root_dir', 
+        type=str, 
+        default='./',
+        help='Root directory for the project'
+    )
+    parser.add_argument(
+        '--model_name', 
+        type=str, 
+        default='romainlhardy/t5-small-booksum',
+        help='Name of the pre-trained model to load for creating chains'
+    )
+    parser.add_argument(
+        '--auth_token', 
+        type=str, 
+        default='',
+        help='Authentication token for loading models from the Huggingface hub'
+    )
+    parser.add_argument(
+        '--strategy', 
+        type=str, 
+        choices=['perplexity', 'graph'], 
+        default='perplexity',
+        help='Strategy for creating chains, either `perplexity` or `graph`'
+    )
+    parser.add_argument(
+        '--use_stemmer', 
+        type=bool, 
+        default=False,
+        help='Whether to use stemming when computing ROUGE scores'
+    )
+    parser.add_argument(
+        '--chain_length', 
+        type=int, 
+        default=5,
+        help='Length of generated chains'
+    )
+    parser.add_argument(
+        '--epsilon', 
+        type=float, 
+        default=0.1,
+        help='Restart probability when computing progression scores using the `graph` strategy'
+    )
+    parser.add_argument(
+        '--progression_weight', 
+        type=float, 
+        default=1.0,
+        help='Weight of the progression score in the total chain score'
+    )
+    parser.add_argument(
+        '--diversity_weight', 
+        type=float,
+        default=1.0,
+        help='Weight of the diversity score in the total chain score'
+    )
+    parser.add_argument(
+        '--importance_weight', 
+        type=float, 
+        default=1.0,
+        help='Weight of the importance score in the total chain score'
+    )
 
     args, _ = parser.parse_known_args()
 
@@ -462,7 +478,7 @@ if __name__ == "__main__":
             tokenizer, 
             chapter_loader, 
             args.use_stemmer, 
-            args.candidate_length,
+            args.chain_length,
         )
     elif args.strategy == 'graph':
         logger.info(f'Loading sentence embedding model {args.model_name}')
@@ -479,9 +495,10 @@ if __name__ == "__main__":
             weights,
             args.use_stemmer,
             args.epsilon,
-            args.candidate_length
+            args.chain_length
         )
         
+    # Join the results to the chapter-level data
     chapter_raw_data = pd.DataFrame(chapter_dataset.raw_data)
     chapter_raw_data['candidate'] = chapter_raw_data.apply(
         lambda row: results['candidate'].get((row['chapter_id'], row['summary_source']), None), 
@@ -490,6 +507,7 @@ if __name__ == "__main__":
     chapter_raw_data = chapter_raw_data.dropna(subset=['candidate'])
     chapter_raw_data['score'] = chapter_raw_data.apply(lambda row: results['score'][(row['chapter_id'], row['summary_source'])], axis=1)
 
+    # Save the results
     save_path = os.path.join(args.root_dir, f'data/chapter/test_t5small_{args.strategy}_k{K}.csv')
     logger.info(f'Saving paragraph-level results to {save_path}')
     save_chapter_results(chapter_raw_data, save_path)

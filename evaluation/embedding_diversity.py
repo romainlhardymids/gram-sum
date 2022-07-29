@@ -13,6 +13,8 @@ from itertools import combinations
 from sentence_transformers import SentenceTransformer, util
 from tqdm.auto import tqdm
 
+nltk.download('punkt')
+
 
 # PyTorch device
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -43,7 +45,7 @@ if __name__ == "__main__":
         '--model_name', 
         type=str, 
         default='',
-        help='Name of the SentenceTransformer model to load'
+        help='Name of the pre-trained SentenceTransformer model to load'
     )
 
     args, _ = parser.parse_known_args()

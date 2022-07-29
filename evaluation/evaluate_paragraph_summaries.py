@@ -112,26 +112,26 @@ if __name__ == "__main__":
     parser.add_argument(
         '--root_dir', 
         type=str, 
-        default='',
+        default='./',
         help='Root directory for the project'
     )
     parser.add_argument(
         '--model_name', 
         type=str, 
-        default='',
-        help='Name of the conditional generation model to use'
+        default='romainlhardy/t5-small-booksum',
+        help='Name of the pre-trained model to load'
     )
     parser.add_argument(
         '--auth_token', 
         type=str, 
         default='',
-        help='Authentication token for loading the NER model from the Huggingface hub'
+        help='Authentication token for loading models from the Huggingface hub'
     )
     parser.add_argument(
         '--use_stemmer', 
         type=bool, 
-        default=False,
-        help='Boolean indicator for whether to use stemming when computing ROUGE scores'
+        default=True,
+        help='Whether to use stemming when computing ROUGE scores'
     )
     parser.add_argument(
         '--num_beams', 

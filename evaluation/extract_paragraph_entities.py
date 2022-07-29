@@ -17,6 +17,8 @@ from transformers import (
     pipeline,
 )
 
+
+# Global variables
 ENTITY_TYPES = set(['PER', 'LOC', 'ORG'])
 LEVELS = ['paragraph', 'chapter', 'book']
 NER_MODEL_NAME = 'romainlhardy/bert-finetuned-ner'
@@ -101,13 +103,13 @@ if __name__ == "__main__":
         '--auth_token', 
         type=str, 
         default='',
-        help='Authentication token for loading the NER model from the Huggingface hub'
+        help='Authentication token for loading the model from the Huggingface hub'
     )
     parser.add_argument(
         '--top_entities',
         type=int,
         default=100,
-        help='Only consider the top n entities by frequency'
+        help='Limits the set of identified entities to the top n entities by frequency'
     )
 
     args, _ = parser.parse_known_args()

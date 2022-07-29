@@ -26,7 +26,10 @@ from transformers import (
     T5ForConditionalGeneration, 
 )
 
+nltk.download('punkt')
 
+
+# PyTorch device
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 NUM_SAMPLES = 10000
 K = 10
@@ -37,7 +40,7 @@ def save_book_results(results, file_path):
     results.to_csv(file_path, index=None)
 
 
-def generate_book_candidates_perplexity(model, tokenizer, chapters_list, candidate_length=512):
+def generate_book_candidates_perplexity(model, tokenizer, chapters_list, chain_length):
     """Generates book-level candidate summaries and compute their perplexities."""
     book_candidates = []
     for chapters in chapters_list:
@@ -45,11 +48,7 @@ def generate_book_candidates_perplexity(model, tokenizer, chapters_list, candida
         paragraph_candidates, perplexities = zip(*zipped)
         sorted_idx = np.argsort(perplexities)
         top_paragraph_idx = []
-        n = 0
-        for i in sorted_idx[:K]:
-            # if n + len(nltk.word_tokenize(paragraph_candidates[i])) > candidate_length:
-            #     break
-            n += len(nltk.word_tokenize(paragraph_candidates[i]))
+        for i in sorted_idx[:chain_length]:
             top_paragraph_idx.append(i)
         book_candidates.append(' '.join([paragraph_candidates[i] for i in sorted(top_paragraph_idx)]))
     book_candidate_tokens = tokenizer(book_candidates, truncation=False, padding='longest', return_tensors='pt').input_ids
@@ -59,14 +58,8 @@ def generate_book_candidates_perplexity(model, tokenizer, chapters_list, candida
     return book_candidates, perplexities
 
 
-def evaluate_books_perplexity(
-    model,
-    tokenizer,
-    book_loader,
-    use_stemmer=True,
-    candidate_length=2048,
-):
-    """Generate and evaluate book-level summaries."""
+def evaluate_books_perplexity(model, tokenizer, book_loader, use_stemmer=True, chain_length=5):
+    """Generates and evaluate book-level summaries."""
     rouge = ROUGEScore(use_stemmer=use_stemmer)
     t = tqdm(book_loader)
     results = {'candidate': {}, 'score': {}}
@@ -82,7 +75,7 @@ def evaluate_books_perplexity(
             model, 
             tokenizer, 
             chapters_list, 
-            candidate_length
+            chain_length
         )
         book_candidates = ['\n'.join(nltk.sent_tokenize(c.strip())) for c in book_candidates]
         references = ['\n'.join(nltk.sent_tokenize(r.strip())) for r in references]
@@ -99,7 +92,7 @@ def evaluate_books_perplexity(
 
 
 def create_book_graph(chapters, book_entities_deduped, book_entities_counts):
-    """Creates an unnormalized bipartite graph linking entities to chapters."""
+    """Creates an unnormalized bipartite graph linking entities to chapter-level summaries."""
     chapter_candidates = [c['candidate'] for c in chapters]
     graph = nx.DiGraph()
     for i, candidate in enumerate(chapter_candidates):
@@ -139,7 +132,7 @@ def compute_steady_state_distribution(T, k, epsilon=0.1):
 
 
 def split_nodes_by_type(graph):
-    """Splits nodes by type (sector or entity)."""
+    """Splits nodes into sectors and entities."""
     node_list = list(graph.nodes())
     sector_nodes = [node for node in node_list if graph.nodes[node]['type'] == 'sector']
     entity_nodes = [node for node in node_list if graph.nodes[node]['type'] == 'entity']
@@ -147,7 +140,7 @@ def split_nodes_by_type(graph):
 
 
 def compute_progression_scores(graph, epsilon=0.1):
-    """Computes progression scores for a chapter-level graph."""
+    """Computes progression scores for a book-level graph."""
     graph = normalize_graph(graph.copy())
     epsilon = 0.1
     T = nx.adjacency_matrix(graph).tolil()
@@ -212,7 +205,7 @@ def compute_entity_overlap_scores(graph):
 
 
 def compute_average_sentence_embeddings(model, chapters):
-    """Computes average sentence embeddings for a set of paragraph summaries."""
+    """Computes average sentence embeddings for a set of chapter summaries."""
     average_sentence_embeddings = []
     for c in chapters:
         sentence_embeddings = [model.encode(s, show_progress_bar=False) for s in nltk.sent_tokenize(c['candidate'])]
@@ -276,21 +269,18 @@ def get_chain_score(scores, chain, dependent=True):
     return chain_score
 
 
-def choose_optimal_chain(pdi_scores, chapter_candidates, weights, candidate_length):
+def choose_optimal_chain(pdi_scores, chapter_candidates, weights, chain_length):
     """Returns the optimal chain given progression, diversity, and importance scores for all sectors."""
     num_sectors = len(pdi_scores['importance'])
     best_chain = []
     best_candidate = ''
     best_score = 0.0
-    chain_length = min(K, num_sectors)
-    num_possible_chains = int(binom(num_sectors, chain_length))
+    chain_length_ = min(chain_length, num_sectors)
+    num_possible_chains = int(binom(num_sectors, chain_length_))
     counter = 0
     while counter < min(2 * num_possible_chains, NUM_SAMPLES):
-        chain = sorted(random.sample(range(num_sectors), chain_length))
+        chain = sorted(random.sample(range(num_sectors), chain_length_))
         book_candidate = ' '.join([chapter_candidates[i] for i in chain])
-        # if len(nltk.word_tokenize(book_candidate)) > candidate_length:
-        #     counter += 1
-        #     continue
         progression_score = get_chain_score(pdi_scores['progression'], chain)
         diversity_score = get_chain_score(pdi_scores['diversity'], chain)
         importance_score = get_chain_score(pdi_scores['importance'], chain, dependent=False)
@@ -312,7 +302,7 @@ def generate_book_candidates_graph(
     book_entities_counts,
     weights,
     epsilon=0.1,
-    candidate_length=512
+    chain_length=5
 ):
     """Generates chapter-level candidate summaries using a graph-based strategy."""
     book_candidates = []
@@ -327,15 +317,15 @@ def generate_book_candidates_graph(
         diversity_scores = compute_diversity_scores(entity_overlap_scores, sentiment_overlap_scores)
         importance_scores = compute_importance_scores(graph, counts)
         pdi_scores = {
-            'progression': progression_scores,
-            'diversity': diversity_scores,
-            'importance': importance_scores,
+            'progression'   : progression_scores,
+            'diversity'     : diversity_scores,
+            'importance'    : importance_scores
         }
         chain, chapter_candidate, score = choose_optimal_chain(
             pdi_scores, 
             chapter_candidates=chapter_candidates, 
             weights=weights,
-            candidate_length=candidate_length
+            chain_length=chain_length
         )
         book_candidates.append(chapter_candidate)
         scores.append(score)
@@ -348,7 +338,7 @@ def evaluate_books_graph(
     weights,
     use_stemmer=True, 
     epsilon=0.1,
-    candidate_length=512
+    chain_length=5
 ):
     """Generates and evaluates chapter-level summaries using a graph-based strategy."""
     rouge = ROUGEScore(use_stemmer=use_stemmer)
@@ -371,7 +361,7 @@ def evaluate_books_graph(
             deduped_book_counts,
             weights=weights,
             epsilon=epsilon,
-            candidate_length=candidate_length
+            chain_length=chain_length
         )
         book_candidates = ['\n'.join(nltk.sent_tokenize(c.strip())) for c in book_candidates]
         references = ['\n'.join(nltk.sent_tokenize(r.strip())) for r in references]
@@ -391,17 +381,67 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--root_dir', type=str, default='')
-    parser.add_argument('--model_name', type=str, default='')
-    parser.add_argument('--auth_token', type=str, default='')
-
-    parser.add_argument('--strategy', type=str, choices=['perplexity', 'graph'], default='perplexity')
-    parser.add_argument('--use_stemmer', type=bool, default=False)
-    parser.add_argument('--candidate_length', type=int, default=3)
-    parser.add_argument('--epsilon', type=float, default=0.1)
-    parser.add_argument('--progression_weight', type=float, default=1.0)
-    parser.add_argument('--diversity_weight', type=float, default=1.0)
-    parser.add_argument('--importance_weight', type=float, default=1.0)
+    parser.add_argument(
+        '--root_dir', 
+        type=str, 
+        default='./',
+        help='Root directory for the project'
+    )
+    parser.add_argument(
+        '--model_name', 
+        type=str, 
+        default='romainlhardy/t5-small-booksum',
+        help='Name of the pre-trained model to load for creating chains'
+    )
+    parser.add_argument(
+        '--auth_token', 
+        type=str, 
+        default='',
+        help='Authentication token for loading models from the Huggingface hub'
+    )
+    parser.add_argument(
+        '--strategy', 
+        type=str, 
+        choices=['perplexity', 'graph'], 
+        default='perplexity',
+        help='Strategy for creating chains, either `perplexity` or `graph`'
+    )
+    parser.add_argument(
+        '--use_stemmer', 
+        type=bool, 
+        default=True,
+        help='Whether to use stemming when computing ROUGE scores'
+    )
+    parser.add_argument(
+        '--chain_length', 
+        type=int, 
+        default=5,
+        help='Length of generated chains'
+    )
+    parser.add_argument(
+        '--epsilon', 
+        type=float, 
+        default=0.1,
+        help='Restart probability when computing progression scores using the `graph` strategy'
+    )
+    parser.add_argument(
+        '--progression_weight', 
+        type=float, 
+        default=1.0,
+        help='Weight of the progression score in the total chain score'
+    )
+    parser.add_argument(
+        '--diversity_weight', 
+        type=float,
+        default=1.0,
+        help='Weight of the diversity score in the total chain score'
+    )
+    parser.add_argument(
+        '--importance_weight', 
+        type=float, 
+        default=1.0,
+        help='Weight of the importance score in the total chain score'
+    )
 
     args, _ = parser.parse_known_args()
 
@@ -415,7 +455,7 @@ if __name__ == "__main__":
 
     # Load data
     logger.info('Loading book-level data')
-    chapter_results_path = os.path.join(args.root_dir, f'data/chapter/test_t5small_{args.strategy}_k5.csv')
+    chapter_results_path = os.path.join(args.root_dir, f'data/chapter/test.csv')
     book_dataset = utils.BookSumBookDataset(args.root_dir, 'test', chapter_results_path)
     book_loader = DataLoader(
         book_dataset, 
@@ -425,8 +465,8 @@ if __name__ == "__main__":
         shuffle=False
     )
 
-    # Chapter-level summary evaluation
-    logger.info(f'Evaluating book-level summaries with strategy {args.strategy}')
+    # Book-level summary evaluation
+    logger.info(f'Evaluating book-level summaries with strategy: {args.strategy}')
     if args.strategy == 'perplexity':
         logger.info(f'Loading perplexity model {args.model_name}')
         model = T5ForConditionalGeneration.from_pretrained(args.model_name, use_auth_token=args.auth_token).to(DEVICE)
@@ -437,7 +477,7 @@ if __name__ == "__main__":
             tokenizer, 
             book_loader, 
             args.use_stemmer, 
-            args.candidate_length,
+            args.chain_length,
         )
     elif args.strategy == 'graph':
         logger.info(f'Loading sentence embedding model {args.model_name}')
@@ -454,9 +494,10 @@ if __name__ == "__main__":
             weights,
             args.use_stemmer,
             args.epsilon,
-            args.candidate_length
+            args.chain_length
         )
         
+    # Join the results to the book-level data
     book_raw_data = pd.DataFrame(book_dataset.raw_data)
     book_raw_data['candidate'] = book_raw_data.apply(
         lambda row: results['candidate'].get((row['book_id'], row['summary_source']), None), 
@@ -465,7 +506,8 @@ if __name__ == "__main__":
     book_raw_data = book_raw_data.dropna(subset=['candidate'])
     book_raw_data['score'] = book_raw_data.apply(lambda row: results['score'][(row['book_id'], row['summary_source'])], axis=1)
 
-    save_path = os.path.join(args.root_dir, f'data/book/test_t5small_{args.strategy}_k{K}.csv')
+    # Save the results
+    save_path = os.path.join(args.root_dir, f'data/book/test.csv')
     logger.info(f'Saving book-level results to {save_path}')
     save_book_results(book_raw_data, save_path)
 
