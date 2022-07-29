@@ -74,7 +74,7 @@ def evaluate_chapters_perplexity(model, tokenizer, chapter_loader, use_stemmer=T
             model, 
             tokenizer, 
             paragraphs_list, 
-            candidate_length
+            chain_length
         )
         chapter_candidates = ['\n'.join(nltk.sent_tokenize(c.strip())) for c in chapter_candidates]
         references = ['\n'.join(nltk.sent_tokenize(r.strip())) for r in references]
@@ -280,9 +280,6 @@ def choose_optimal_chain(pdi_scores, paragraph_candidates, weights, chain_length
     while counter < min(2 * num_possible_chains, NUM_SAMPLES):
         chain = sorted(random.sample(range(num_sectors), chain_length_))
         chapter_candidate = ' '.join([paragraph_candidates[i] for i in chain])
-        if len(nltk.word_tokenize(chapter_candidate)) > candidate_length:
-            counter += 1
-            continue
         progression_score = get_chain_score(pdi_scores['progression'], chain)
         diversity_score = get_chain_score(pdi_scores['diversity'], chain)
         importance_score = get_chain_score(pdi_scores['importance'], chain, dependent=False)
