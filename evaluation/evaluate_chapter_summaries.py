@@ -465,7 +465,7 @@ if __name__ == "__main__":
     )
 
     # Chapter-level summary evaluation
-    logger.info(f'Evaluating paragraph-level summaries with strategy {args.strategy}')
+    logger.info(f'Evaluating paragraph-level summaries with strategy: {args.strategy}')
     if args.strategy == 'perplexity':
         logger.info(f'Loading perplexity model {args.model_name}')
         model = T5ForConditionalGeneration.from_pretrained(args.model_name, use_auth_token=args.auth_token).to(DEVICE)

@@ -69,7 +69,7 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
 !python3 ./gram-sum/evaluation/evaluate_chapter_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project \
     --model_name=all-mpnet-base-v2 \
-    --auth_token=<HUGGINGFACE_AUTH_TOKEN> \
+    --auth_token=<HUGGINGFACE AUTHENTICATION TOKEN> \
     --strategy='graph' \
     --use_stemmer=True \
     --chain_length=5 \
@@ -84,7 +84,7 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
 !python3 ./gram-sum/evaluation/evaluate_book_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project \
     --model_name=all-mpnet-base-v2 \
-    --auth_token=<HUGGINGFACE_AUTH_TOKEN> \
+    --auth_token=<HUGGINGFACE AUTHENTICATION TOKEN> \
     --strategy='graph' \
     --use_stemmer=True \
     --chain_length=5 \
