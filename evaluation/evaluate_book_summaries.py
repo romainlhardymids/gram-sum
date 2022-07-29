@@ -32,7 +32,6 @@ nltk.download('punkt')
 # PyTorch device
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 NUM_SAMPLES = 10000
-K = 10
 
 
 def save_book_results(results, file_path):
