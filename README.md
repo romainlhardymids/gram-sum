@@ -72,9 +72,9 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
     --use_stemmer=True \
     --chain_length=5 \
     --epsilon=0.1 \
-    --args.progression_weight=1 \
-    --args.diversity_weight=1 \
-    --args.importance_weight=1
+    --progression_weight=1 \
+    --diversity_weight=1 \
+    --importance_weight=1
 ```
 
 ## Generating and evaluating book-level summaries<a name="evaluate-book"></a>
@@ -87,9 +87,9 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
     --use_stemmer=True \
     --chain_length=5 \
     --epsilon=0.1 \
-    --args.progression_weight=1 \
-    --args.diversity_weight=1 \
-    --args.importance_weight=1
+    --progression_weight=1 \
+    --diversity_weight=1 \
+    --importance_weight=1
 ```
 
 ## Calculating average pairwise sentence embeddings<a name="pairwise-embeddings"></a>
