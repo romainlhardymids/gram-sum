@@ -26,7 +26,7 @@ To download the BookSum dataset, please follow the instructions at https://githu
 ```
 
 ## Fine-tuning a paragraph-level encoder-decoder model<a name="finetune-booksum"></a>
-At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tuned on the BookSum dataset. To replicate this training, you may use the code found in `training/finetune-booksum.py` and `training/finetune-booksum.ipynb`. Although the notebook was originally run in SageMaker, it can be adapted to run locally or in Colab.
+At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tuned on the BookSum dataset. To replicate this training, you may use the code found in `training/finetune-booksum.py` and `training/finetune-booksum.ipynb`. Although the notebook was originally run in AWS SageMaker, it can be adapted to run locally or in Google Colab.
 
 ## Fine-tuning a named entity recognition model<a name="finetune-ner"></a>
 ```
