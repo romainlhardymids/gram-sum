@@ -26,6 +26,7 @@ from transformers import (
 nltk.download('punkt')
 
 
+# PyTorch device
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
