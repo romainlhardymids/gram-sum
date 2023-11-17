@@ -20,7 +20,7 @@ To download the BookSum dataset, please follow the instructions at https://githu
 
 ## Preparing the BookSum data<a name="prepare-data"></a>
 ```
-!python3 ./gram-sum/setup/load_booksum_data.py \
+python3 ./gram-sum/setup/load_booksum_data.py \
     --booksum_dir=/content/drive/MyDrive/W266/Final\ Project/booksum/ \
     --save_dir=/content/drive/MyDrive/W266/Final\ Project/data/
 ```
@@ -30,7 +30,7 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
 
 ## Fine-tuning a named entity recognition model<a name="finetune-ner"></a>
 ```
-!python3 ./gram-sum/training/finetune_ner.py \
+python3 ./gram-sum/training/finetune_ner.py \
     --output_dir=./finetuned-ner \
     --model_name=bert-base-cased \
     --auth_token=<HUGGINGFACE AUTHENTICATION TOKEN> \
@@ -44,14 +44,14 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
 
 ## Extracting and resolving entities<a name="extract-entities"></a>
 ```
-!python3 ./gram-sum/evaluation/extract_paragraph_entities.py \
+python3 ./gram-sum/evaluation/extract_paragraph_entities.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project/ \
     --top_entities=100
 ```
 
 ## Generating and evaluating paragraph-level summaries<a name="evaluate-paragraph"></a>
 ```
-!python3 ./gram-sum/evaluation/evaluate_paragraph_summaries.py \
+python3 ./gram-sum/evaluation/evaluate_paragraph_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project/ \
     --model_name=romainlhardy/t5-small-booksum \
     --auth_token=<HUGGINGFACE AUTHENTICATION TOKEN> \
@@ -64,7 +64,7 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
 
 ## Generating and evaluating chapter-level summaries<a name="evaluate-chapter"></a>
 ```
-!python3 ./gram-sum/evaluation/evaluate_chapter_summaries.py \
+python3 ./gram-sum/evaluation/evaluate_chapter_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project \
     --model_name=all-mpnet-base-v2 \
     --auth_token=<HUGGINGFACE AUTHENTICATION TOKEN> \
@@ -79,7 +79,7 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
 
 ## Generating and evaluating book-level summaries<a name="evaluate-book"></a>
 ```
-!python3 ./gram-sum/evaluation/evaluate_book_summaries.py \
+python3 ./gram-sum/evaluation/evaluate_book_summaries.py \
     --root_dir=/content/drive/MyDrive/W266/Final\ Project \
     --model_name=all-mpnet-base-v2 \
     --auth_token=<HUGGINGFACE AUTHENTICATION TOKEN> \
@@ -94,7 +94,7 @@ At the paragraph level, GraM-SUM uses a `t5-small` encoder-decoder model fine-tu
 
 ## Calculating average pairwise sentence embeddings<a name="pairwise-embeddings"></a>
 ```
-!python3 ./gram-sum/evaluation/embedding_diversity.py \
+python3 ./gram-sum/evaluation/embedding_diversity.py \
     --results_path=/content/drive/MyDrive/W266/Final\ Project/data/book/test.csv \
     --model_name=all-mpnet-base-v2
 ```
